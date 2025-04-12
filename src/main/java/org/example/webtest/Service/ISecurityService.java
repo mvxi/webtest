@@ -1,5 +1,8 @@
 package org.example.webtest.Service;
 
+import org.example.webtest.Model.SecurityInfo;
+
+
 public interface ISecurityService {
-    String getNotice(String imageUrl, String sceneType);
+    SecurityInfo getNotice(String imageUrl, String sceneType);
 }

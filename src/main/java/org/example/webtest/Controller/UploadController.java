@@ -1,6 +1,8 @@
 package org.example.webtest.Controller;
 
+import org.example.webtest.Model.SecurityInfo;
 import org.example.webtest.Service.ISecurityService;
+import org.example.webtest.Utils.APIResponsePacker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +21,11 @@ public class UploadController {
     @Autowired
     ISecurityService securityService;
     @PostMapping("/upload")
-    public APIResponsePacker<String> upload(@RequestParam("imgFile") MultipartFile file, @RequestParam("imgName") String name, @RequestParam("sceneType") String sceneType) throws Exception {
+    public APIResponsePacker<SecurityInfo> upload(@RequestParam("imgFile") MultipartFile file, @RequestParam("imgName") String name,
+                                                  @RequestParam(value = "sceneType", required = false) String sceneType,
+                                                  @RequestParam(value = "imgMd5Name",required = false, defaultValue = "") String imgMd5Name,
+                                                  @RequestParam(value = "lat",required = false, defaultValue = "0") String lat,
+                                                  @RequestParam(value = "lng",required = false, defaultValue = "0") String lng) throws Exception {
         // 设置上传至项目文件夹下的uploadFile文件夹中，没有文件夹则创建
         File dir = new File("uploadFile");
         if (!dir.exists()) {
@@ -27,23 +33,22 @@ public class UploadController {
         }
         String filePath = dir.getAbsolutePath() + File.separator + file.getOriginalFilename();
         String fileUrl = "https://www.xwhr8.com/image/" + file.getOriginalFilename();
-        logger.info("upload file url:" + fileUrl+"  scene type:" + sceneType);
+        logger.info("upload file url:" + fileUrl+"  scene type:" + sceneType+"  md5name:" + imgMd5Name + " lat:" + lat + " lng:" + lng);
 
         file.transferTo(new File(filePath));
         //file.transferTo(new File(dir.getAbsolutePath() + File.separator + name + ".png"));
 
         //return "上传完成！文件名：" + fileUrl + " \n ";
-        String notice = securityService.getNotice(fileUrl, sceneType);
-        return new APIResponsePacker<String>(0,"", notice);
+        SecurityInfo security = securityService.getNotice(fileUrl, sceneType);
+        return new APIResponsePacker<SecurityInfo>(0,"", security);
     }
 
     @RequestMapping("llm")
-    public APIResponsePacker<String> llm()  {
+    public  APIResponsePacker<SecurityInfo> llm()  {
         logger.info("llm:");
 
         String imageUrl =   "https://www.xwhr8.com/image/fbc6b16e9db7d59b8b09698c7ede0f7c.jpeg";
-       // return securityService.getNotice(imageUrl,1);
-        return new APIResponsePacker<String>(0,"", securityService.getNotice(imageUrl,"0"));
+        return new APIResponsePacker<SecurityInfo>(0,"", securityService.getNotice(imageUrl,"10000"));
     }
 }
 /*

@@ -1,4 +1,4 @@
-package org.example.webtest.Controller;
+package org.example.webtest.Utils;
 
 public class APIResponsePacker<T> {
     private T data;

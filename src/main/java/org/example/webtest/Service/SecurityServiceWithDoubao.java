@@ -7,12 +7,14 @@ import com.volcengine.ark.runtime.model.completion.chat.ChatMessageRole;
 import com.volcengine.ark.runtime.service.ArkService;
 import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
+import org.example.webtest.Model.SecurityInfo;
+import org.example.webtest.Utils.JsonEscape;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
-
+import org.example.webtest.Model.SecurityInfo;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -29,7 +31,8 @@ public class SecurityServiceWithDoubao implements ISecurityService {
     private PromptService promptService;
 
     @Override
-    public String getNotice(String imageUrl, String sceneType) {
+    public SecurityInfo getNotice(String imageUrl, String sceneType) {
+
         ConnectionPool connectionPool = new ConnectionPool(5, 1, TimeUnit.SECONDS);
         Dispatcher dispatcher = new Dispatcher();
 
@@ -58,17 +61,24 @@ public class SecurityServiceWithDoubao implements ISecurityService {
         List<String> output = new ArrayList<>();
         try {
             service.createChatCompletion(chatCompletionRequest).getChoices().forEach(choice -> output.add((String)choice.getMessage().getContent()));
+
         } catch (Exception e) {
-            logger.error("create chat completion error. imageUrl:"+imageUrl+"  "+e.getMessage());
+            logger.error("create vision completion error. imageUrl:"+imageUrl+"  "+e.getMessage());
         } finally {
             service.shutdownExecutor();
         }
 
-        return outputFilter(output.toString());
+        return outputFormat(output.get(0));
     }
 
-    private String outputFilter(String output) {
-        return output.replaceAll("\\s","");
+    private SecurityInfo outputFormat(String output) {
+        //1. 删除空格，\n等字符
+        String filter = output.replaceAll("\\s","");
+        //2. 如果字符串不是以 {}开头结尾，手动拼一个。。。
+        String tempStr = "{" + filter +"}";
+
+        JsonEscape jsonEscape = new JsonEscape();
+        return jsonEscape.unSecurityString(tempStr);
     }
 
 }
