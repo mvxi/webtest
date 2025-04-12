@@ -25,7 +25,10 @@ public class UploadController {
                                                   @RequestParam(value = "sceneType", required = false) String sceneType,
                                                   @RequestParam(value = "imgMd5Name",required = false, defaultValue = "") String imgMd5Name,
                                                   @RequestParam(value = "lat",required = false, defaultValue = "0") String lat,
-                                                  @RequestParam(value = "lng",required = false, defaultValue = "0") String lng) throws Exception {
+                                                  @RequestParam(value = "lng",required = false, defaultValue = "0") String lng,
+                                                  @RequestParam(value = "androidId", required = false, defaultValue = "0") String did
+
+    ) throws Exception {
         // 设置上传至项目文件夹下的uploadFile文件夹中，没有文件夹则创建
         File dir = new File("uploadFile");
         if (!dir.exists()) {
@@ -33,7 +36,7 @@ public class UploadController {
         }
         String filePath = dir.getAbsolutePath() + File.separator + file.getOriginalFilename();
         String fileUrl = "https://www.xwhr8.com/image/" + file.getOriginalFilename();
-        logger.info("upload file url:" + fileUrl+"  scene type:" + sceneType+"  md5name:" + imgMd5Name + " lat:" + lat + " lng:" + lng);
+        logger.info("upload file url:" + fileUrl+"  scene type:" + sceneType+"  md5name:" + imgMd5Name + " lat:" + lat + " lng:" + lng+ " androidid:" + did);
 
         file.transferTo(new File(filePath));
         //file.transferTo(new File(dir.getAbsolutePath() + File.separator + name + ".png"));
