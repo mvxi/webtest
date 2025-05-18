@@ -1,4 +1,4 @@
-package org.example.webtest.Service;
+package org.example.webtest.Utils;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -6,15 +6,13 @@ import java.nio.file.Paths;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-import java.io.IOException;
-
-@Service
+@Component
 public class PromptService {
     private static final Logger logger = LoggerFactory.getLogger(PromptService.class);
-    final String promptFile = "./prompt_list.txt";
-    private String securityPrompt = "###背景：在施工现场进行安全巡视，查找施工的过程中不符合安全法规的地方，来进行整改\n" +
+    private static String promptFile = "./prompt_list.txt";
+    private static String securityPrompt = "###背景：在施工现场进行安全巡视，查找施工的过程中不符合安全法规的地方，来进行整改\n" +
             "###角色：你是安全施工巡检员 ###要求：指出不符合的安全法规的项，要求两个版本，一个重要版，一个详细版\n"+
             "###输出内容：关注4个方面，安全隐患、重要提醒、法律依据、巡检建议，对每个方面展开多个维度的描述，并对每个维度有简短概括。针对以上内容，生成一个重要版(important_version)，一个详细版(detailed_version)，以及安全隐患总数量，最后对所有输出内容以json格式输出,参考输出格式如下："+
             "{" +
@@ -36,13 +34,13 @@ public class PromptService {
             "}," +
             "}";
 
-    private String chatPrompt = "###角色：你是安全法律法规专家，对用户的问题给与相关方面的专业解答，字数限定在200以内\n" +
+    private static String chatPrompt = "###角色：你是安全法律法规专家，对用户的问题给与相关方面的专业解答，字数限定在200以内\n" +
             "###问题：";
 
 
 
 
-    public void updatePromptFromFile() {
+    public static void updatePromptFromFile() {
         try {
             File file = new File(promptFile);
             String content = new String(Files.readAllBytes(Paths.get(file.toURI())));
@@ -55,7 +53,7 @@ public class PromptService {
         }
     }
 
-    public String getPrompt(String sceneType) {
+    public static String getPrompt(String sceneType) {
         String prompt = "";
         switch (sceneType) {
             case "10000":
@@ -71,7 +69,7 @@ public class PromptService {
         return prompt;
     }
 
-    public String getChatPrompt(String content, String sceneType) {
+    public static String getChatPrompt(String content, String sceneType) {
         return getPrompt(sceneType)+content;
     }
 }

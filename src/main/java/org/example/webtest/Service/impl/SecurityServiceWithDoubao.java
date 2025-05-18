@@ -1,4 +1,4 @@
-package org.example.webtest.Service;
+package org.example.webtest.Service.impl;
 
 import com.volcengine.ark.runtime.model.completion.chat.ChatCompletionContentPart;
 import com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest;
@@ -8,39 +8,43 @@ import com.volcengine.ark.runtime.service.ArkService;
 import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
 import org.example.webtest.Model.SecurityInfo;
+import org.example.webtest.Service.ISecurityService;
+import org.example.webtest.Utils.Constants;
 import org.example.webtest.Utils.JsonEscape;
+import org.example.webtest.Utils.PromptService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
-import org.example.webtest.Model.SecurityInfo;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
 
 @Service
 @Primary
 public class SecurityServiceWithDoubao implements ISecurityService {
     private static final Logger logger = LoggerFactory.getLogger(SecurityServiceWithDoubao.class);
 
-    final String API_KEY = "8cbbe228-d6f2-407f-a14a-4fdddebb54d4";
-    final String VISION_MODEL_URL = "https://ark.cn-beijing.volces.com/api/v3/chat/completions";
-    final String VISION_MODEL_ID = "doubao-1-5-vision-pro-32k-250115";
+
     @Autowired
     private PromptService promptService;
 
     @Override
-    public SecurityInfo getNotice(String imageUrl, String sceneType) {
-
+    public SecurityInfo getNotice(String imageUrl, String fileName, String sceneType) {
         ConnectionPool connectionPool = new ConnectionPool(5, 1, TimeUnit.SECONDS);
         Dispatcher dispatcher = new Dispatcher();
+        ArkService service = ArkService.builder().dispatcher(dispatcher).connectionPool(connectionPool).baseUrl(Constants.VISION_MODEL_URL).apiKey(Constants.API_KEY).build();
 
-        ArkService service = ArkService.builder().dispatcher(dispatcher).connectionPool(connectionPool).baseUrl(VISION_MODEL_URL).apiKey(API_KEY).build();
         final List<ChatMessage> messages = new ArrayList<>();
         final List<ChatCompletionContentPart> multiParts = new ArrayList<>();
         multiParts.add(ChatCompletionContentPart.builder().type("text").text(
-                promptService.getPrompt(sceneType)
+                PromptService.getPrompt(sceneType)
         ).build());
         multiParts.add(ChatCompletionContentPart.builder().type("image_url").imageUrl(
                 new ChatCompletionContentPart.ChatCompletionContentPartImageURL(
@@ -55,7 +59,7 @@ public class SecurityServiceWithDoubao implements ISecurityService {
         messages.add(assistantMessage);
 
         ChatCompletionRequest chatCompletionRequest = ChatCompletionRequest.builder()
-                .model(VISION_MODEL_ID)
+                .model(Constants.VISION_MODEL_ID)
                 .messages(messages)
                 .build();
         List<String> output = new ArrayList<>();
@@ -63,13 +67,20 @@ public class SecurityServiceWithDoubao implements ISecurityService {
             service.createChatCompletion(chatCompletionRequest).getChoices().forEach(choice -> output.add((String)choice.getMessage().getContent()));
 
         } catch (Exception e) {
-            logger.error("create vision completion error. imageUrl:"+imageUrl+"  "+e.getMessage());
+            logger.error("create vision completion error by imageurl. imageUrl:"+imageUrl+"  .error info:"+e.getMessage());
         } finally {
             service.shutdownExecutor();
         }
 
-        return outputFormat(output.get(0));
+        SecurityInfo securityInfo = new SecurityInfo();
+        if(!output.isEmpty()){
+            securityInfo = outputFormat(output.get(0));
+        }
+        return securityInfo;
     }
+
+
+
 
     private SecurityInfo outputFormat(String output) {
         //1. 删除空格，\n等字符
@@ -79,8 +90,57 @@ public class SecurityServiceWithDoubao implements ISecurityService {
 
         JsonEscape jsonEscape = new JsonEscape();
         return jsonEscape.unSecurityString(tempStr);
+       // return JsonEscape.unSecurityString(tempStr);
     }
 
+    public SecurityInfo getNotice(MultipartFile file, String fileName, String sceneType) {
+        String fileContent = convertMultipartFileToBase64(file);
+        if (fileContent == null || fileContent.isEmpty()) {
+            return null;
+        }
+        ConnectionPool connectionPool = new ConnectionPool(5, 1, TimeUnit.SECONDS);
+        Dispatcher dispatcher = new Dispatcher();
+        ArkService service = ArkService.builder().dispatcher(dispatcher).connectionPool(connectionPool).baseUrl(Constants.VISION_MODEL_URL).apiKey(Constants.API_KEY).build();
+
+        final List<ChatMessage> messages = new ArrayList<>();
+        final List<ChatCompletionContentPart> multiParts = new ArrayList<>();
+        multiParts.add(ChatCompletionContentPart.builder().type("text").text(
+                PromptService.getPrompt(sceneType)
+        ).build());
+        multiParts.add(ChatCompletionContentPart.builder().type("content").content(fileContent).build());
+        final ChatMessage userMessage = ChatMessage.builder().role(ChatMessageRole.USER)
+                .multiContent(multiParts).build();
+        final ChatMessage assistantMessage = ChatMessage.builder().role(ChatMessageRole.ASSISTANT)
+                .content("{").build();
+        messages.add(userMessage);
+        messages.add(assistantMessage);
+
+        ChatCompletionRequest chatCompletionRequest = ChatCompletionRequest.builder()
+                .model(Constants.VISION_MODEL_ID)
+                .messages(messages)
+                .build();
+        List<String> output = new ArrayList<>();
+        try {
+            service.createChatCompletion(chatCompletionRequest).getChoices().forEach(choice -> output.add((String)choice.getMessage().getContent()));
+        } catch (Exception e) {
+            logger.error("create vision completion by content error. filename:"+fileName+" . error info:"+e.getMessage());
+        } finally {
+            service.shutdownExecutor();
+        }
+
+        return outputFormat(output.get(0));
+    }
+
+    public String convertMultipartFileToBase64(MultipartFile file)  {
+        byte[] fileContent;
+        try {
+            fileContent = file.getBytes(); // 获取文件内容
+        } catch (IOException e) {
+            logger.error("file "+file.getOriginalFilename()+"  getbyte error. info:"+e.getMessage());
+            return "";
+        }
+        return Base64.getEncoder().encodeToString(fileContent); // 转换为Base64字符串
+    }
 }
 
 /**
