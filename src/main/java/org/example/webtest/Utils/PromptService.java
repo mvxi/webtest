@@ -57,7 +57,7 @@ public class PromptService {
         String prompt = "";
         switch (sceneType) {
             case "10000":
-                updatePromptFromFile();
+        //        updatePromptFromFile();
                 prompt = securityPrompt;
                 break;
             case "20000":

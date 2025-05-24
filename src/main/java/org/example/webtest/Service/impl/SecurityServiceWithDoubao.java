@@ -95,6 +95,8 @@ public class SecurityServiceWithDoubao implements ISecurityService {
 
     public SecurityInfo getNotice(MultipartFile file, String fileName, String sceneType) {
         String fileContent = convertMultipartFileToBase64(file);
+        logger.info("by content 1"+fileContent.length());
+
         if (fileContent == null || fileContent.isEmpty()) {
             return null;
         }
@@ -104,16 +106,23 @@ public class SecurityServiceWithDoubao implements ISecurityService {
 
         final List<ChatMessage> messages = new ArrayList<>();
         final List<ChatCompletionContentPart> multiParts = new ArrayList<>();
+        logger.info("by content 2"+fileContent.length());
+
         multiParts.add(ChatCompletionContentPart.builder().type("text").text(
                 PromptService.getPrompt(sceneType)
         ).build());
-        multiParts.add(ChatCompletionContentPart.builder().type("content").content(fileContent).build());
+        multiParts.add(ChatCompletionContentPart.builder().type("image_url").imageUrl(
+            new ChatCompletionContentPart.ChatCompletionContentPartImageURL(
+                    fileContent
+            )
+        ).build());        
         final ChatMessage userMessage = ChatMessage.builder().role(ChatMessageRole.USER)
                 .multiContent(multiParts).build();
         final ChatMessage assistantMessage = ChatMessage.builder().role(ChatMessageRole.ASSISTANT)
                 .content("{").build();
         messages.add(userMessage);
         messages.add(assistantMessage);
+        logger.info("by content 3"+fileContent.length());
 
         ChatCompletionRequest chatCompletionRequest = ChatCompletionRequest.builder()
                 .model(Constants.VISION_MODEL_ID)
@@ -127,7 +136,7 @@ public class SecurityServiceWithDoubao implements ISecurityService {
         } finally {
             service.shutdownExecutor();
         }
-
+        logger.info("by content 4");
         return outputFormat(output.get(0));
     }
 
@@ -139,7 +148,17 @@ public class SecurityServiceWithDoubao implements ISecurityService {
             logger.error("file "+file.getOriginalFilename()+"  getbyte error. info:"+e.getMessage());
             return "";
         }
-        return Base64.getEncoder().encodeToString(fileContent); // 转换为Base64字符串
+        
+        // 获取文件类型
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            logger.error("Invalid file type: " + contentType);
+            return "";
+        }
+        
+        // 转换为Base64字符串并添加data URI前缀
+        String base64Content = Base64.getEncoder().encodeToString(fileContent);
+        return "data:" + contentType + ";base64," + base64Content;
     }
 }
 

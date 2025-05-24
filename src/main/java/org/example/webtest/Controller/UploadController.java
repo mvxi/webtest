@@ -1,9 +1,11 @@
 package org.example.webtest.Controller;
 
+import org.example.webtest.Exception.BusinessException;
 import org.example.webtest.Model.SecurityInfo;
 import org.example.webtest.Service.ISecurityService;
 import org.example.webtest.Utils.APIResponsePacker;
 import org.example.webtest.Utils.Constants;
+import org.example.webtest.Utils.ResultCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,33 +17,58 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
-
+import java.util.Arrays;
+import java.util.List;
 
 @RestController
 public class UploadController {
     private static final Logger logger = LoggerFactory.getLogger(UploadController.class);
+    private static final List<String> ALLOW_TYPES = Arrays.asList("image/jpeg","image/jpg","image/png","image/gif","image/bmp","image/webp");
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
     @Autowired
     ISecurityService securityService;
+
     @PostMapping("/upload")
-    public APIResponsePacker<SecurityInfo> upload(@RequestParam("imgFile") MultipartFile file, @RequestParam("imgName") String name,
-                                                  @RequestParam(value = "sceneType", required = false) String sceneType,
-                                                  @RequestParam(value = "imgMd5Name",required = false, defaultValue = "") String imgMd5Name,
-                                                  @RequestParam(value = "lat",required = false, defaultValue = "0") String lat,
-                                                  @RequestParam(value = "lng",required = false, defaultValue = "0") String lng,
-                                                  @RequestParam(value = "androidId", required = false, defaultValue = "0") String did
+    public APIResponsePacker<SecurityInfo> upload(@RequestParam("imgFile") MultipartFile file, 
+                                                 @RequestParam("imgName") String name,
+                                                 @RequestParam(value = "sceneType", required = false) String sceneType,
+                                                 @RequestParam(value = "imgMd5Name",required = false, defaultValue = "") String imgMd5Name,
+                                                 @RequestParam(value = "lat",required = false, defaultValue = "0") String lat,
+                                                 @RequestParam(value = "lng",required = false, defaultValue = "0") String lng,
+                                                 @RequestParam(value = "androidId", required = false, defaultValue = "0") String did) {
+        long startTime = System.currentTimeMillis();
+        try {
+            checkImageInfo(file);
+            String fileName = formatFileName(file.getOriginalFilename(), imgMd5Name);
+            storeImage(file, fileName);
 
-    ) throws Exception {
-        String fileName = formatFileName(file.getOriginalFilename(), imgMd5Name);
+            String fileUrl = Constants.DOMAIN_IMAGE + fileName;
+            logger.info("upload file url:" + fileUrl+"  scene type:" + sceneType+"  md5name:" + imgMd5Name +"   original name:"+file.getOriginalFilename()+ " lat:" + lat + " lng:" + lng+ " androidid:" + did);
 
-        //store the uploaded images on server
-        storeImage(file, fileName);
+            SecurityInfo security = securityService.getNotice(fileUrl, fileName, sceneType);
+            return new APIResponsePacker<>(ResultCode.SUCCESS.getCode(), ResultCode.SUCCESS.getMessage(), security);
+        } finally {
+            long endTime = System.currentTimeMillis();
+            long executionTime = endTime - startTime;
+            logger.info("Upload execution time: {} ms for file: {}", executionTime, file.getOriginalFilename());
+        }
+    }
 
-        String fileUrl = Constants.DOMAIN_IMAGE + fileName;
-        logger.info("upload file url:" + fileUrl+"  scene type:" + sceneType+"  md5name:" + imgMd5Name +"   original name:"+file.getOriginalFilename()+ " lat:" + lat + " lng:" + lng+ " androidid:" + did);
+    private void checkImageInfo(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new BusinessException(ResultCode.FILE_NOT_FOUND, "File is empty");
+        }
 
-        SecurityInfo security = securityService.getNotice(fileUrl, fileName, sceneType);
-        return new APIResponsePacker<SecurityInfo>(0,"", security);
+        String contentType = file.getContentType();
+        if (!ALLOW_TYPES.contains(contentType)) {
+            throw new BusinessException(ResultCode.FILE_TYPE_ERROR, "Invalid file type: " + contentType);
+        }
+
+        long fileSize = file.getSize();
+        if (fileSize > MAX_FILE_SIZE) {
+            throw new BusinessException(ResultCode.FILE_SIZE_ERROR, "File size exceeds limit: " + fileSize);
+        }
     }
 
     private String formatFileName(String originalFilename, String md5FileName) {
@@ -50,13 +77,11 @@ public class UploadController {
             fileName = md5FileName;
         }
         
-        // Get file extension from originalFilename
         String extension = "";
         if (originalFilename != null && originalFilename.contains(".")) {
             extension = originalFilename.substring(originalFilename.lastIndexOf("."));
         }
         
-        // Append extension if fileName doesn't already have it
         if (!extension.isEmpty() && !fileName.endsWith(extension)) {
             fileName += extension;
         }
@@ -64,8 +89,7 @@ public class UploadController {
         return fileName;
     }
 
-    private boolean storeImage(MultipartFile file, String fileName) {
-        // 设置上传至项目文件夹下的uploadFile文件夹中，没有文件夹则创建
+    private void storeImage(MultipartFile file, String fileName) {
         File dir = new File("uploadFile");
         if (!dir.exists()) {
             dir.mkdirs();
@@ -75,17 +99,17 @@ public class UploadController {
             file.transferTo(new File(filePath));
         } catch(IOException e) {
             logger.error("store image "+fileName+" error. info:"+e.getMessage());
-            return false;
+            throw new BusinessException(ResultCode.FILE_UPLOAD_ERROR, "Failed to store file: " + e.getMessage());
         }
-        return true;
     }
 
     @RequestMapping("llm")
-    public  APIResponsePacker<SecurityInfo> llm()  {
+    public APIResponsePacker<SecurityInfo> llm() {
         logger.info("llm:");
         String fileName = "fbc6b16e9db7d59b8b09698c7ede0f7c.jpeg";
-        String imageUrl =   "https://www.xwhr8.com/image/fbc6b16e9db7d59b8b09698c7ede0f7c.jpeg";
-        return new APIResponsePacker<SecurityInfo>(0,"", securityService.getNotice(imageUrl,fileName,"10000"));
+        String imageUrl = "https://www.xwhr8.com/image/fbc6b16e9db7d59b8b09698c7ede0f7c.jpeg";
+        return new APIResponsePacker<>(ResultCode.SUCCESS.getCode(), ResultCode.SUCCESS.getMessage(), 
+            securityService.getNotice(imageUrl, fileName, "10000"));
     }
 }
 /*
