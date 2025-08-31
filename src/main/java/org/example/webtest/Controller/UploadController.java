@@ -105,7 +105,7 @@ public class UploadController {
 
     @RequestMapping("llm")
     public APIResponsePacker<SecurityInfo> llm() {
-        logger.info("llm:");
+        logger.info("llm start:");
         String fileName = "fbc6b16e9db7d59b8b09698c7ede0f7c.jpeg";
         String imageUrl = "https://www.xwhr8.com/image/fbc6b16e9db7d59b8b09698c7ede0f7c.jpeg";
         return new APIResponsePacker<>(ResultCode.SUCCESS.getCode(), ResultCode.SUCCESS.getMessage(), 
